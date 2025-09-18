@@ -6,10 +6,16 @@
 //
 
 import UIKit
+import FirebaseAuth
+import FirebaseFirestore
 
 class ViewController: UIViewController {
     
     @IBOutlet weak var dateStackView: UIStackView!
+    @IBOutlet weak var nameLabel: UILabel!
+    @IBOutlet weak var levelLabel: UILabel!
+    @IBOutlet weak var expLabel: UILabel!
+    @IBOutlet weak var expBar: UIProgressView!
     
     private var startOfWeek: Date = Date()
     private var currentWeekDates: [Date] = []
@@ -18,6 +24,11 @@ class ViewController: UIViewController {
     private let circleSize: CGFloat = 44.0
     private let circleHalf: CGFloat = 22.0
     
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        self.navigationController?.isNavigationBarHidden = true
+    }
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -25,7 +36,43 @@ class ViewController: UIViewController {
         currentWeekDates = generateWeek(from: startOfWeek)
         
         reloadWeekViews()
+        fetchAndDisplayUserDetails()
+        
     }
+    
+    func fetchAndDisplayUserDetails() {
+        guard let currentUserUID = Auth.auth().currentUser?.uid else {
+            self.nameLabel.text = "Welcome!"
+            print("No user is logged in.")
+            return
+        }
+        
+        let db = Firestore.firestore()
+        let userRef = db.collection("users").document(currentUserUID)
+        
+        userRef.getDocument { (document, error) in
+            if let document = document, document.exists {
+                let displayName = document.data()?["displayName"] as? String ?? "No Name"
+                let currentLevel = document.data()?["level"] as? Int ?? 0
+                let currentExp = document.data()?["currentXP"] as? Int ?? 0
+                let maxExp = document.data()?["xpToNextLevel"] as? Int ?? 0
+                
+                DispatchQueue.main.async {
+                    self.nameLabel.text = "\(displayName)"
+                    self.levelLabel.text = "Lvl. \(currentLevel)"
+                    self.expLabel.text = "\(currentExp)/\(maxExp) XP"
+                }
+            } else {
+                print("User document does not exist or there was an error: \(error?.localizedDescription ?? "")")
+                DispatchQueue.main.async {
+                    self.nameLabel.text = "No Name"
+                    self.levelLabel.text = "Lvl. 0"
+                    self.expLabel.text = "0/0 XP"
+                }
+            }
+        }
+    }
+
     
     // MARK: - Week generation
     
